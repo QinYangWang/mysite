@@ -32,7 +32,13 @@
 			"binding": "BUCKET",
 			"remote": true
 		}
-	]
+	],
+	"analytics_engine_datasets": [
+		{
+			"binding": "ANALYTICS",
+			"dataset": "mysite_analytics"
+		}
+	],
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
