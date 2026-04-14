@@ -56,21 +56,22 @@ blogAPI.get('/posts/:slug', async (c) => {
 // 获取图片
 blogAPI.get('/images/:key+', async (c) => {
   try {
-    const key = `images/${c.req.param('key')}`;
+    const rawKey = c.req.param('key');
+    const key = `images/${rawKey}`;
+
     const object = await c.env.BUCKET.get(key);
-    
-    if (!object) {
-      return c.json({ success: false, error: 'Image not found' }, 404);
+    if (object) {
+      const headers = new Headers();
+      object.writeHttpMetadata(headers);
+      headers.set('etag', object.httpEtag);
+      headers.set('Cache-Control', 'public, max-age=31536000');
+
+      return new Response(object.body, {
+        headers,
+      });
     }
-    
-    const headers = new Headers();
-    object.writeHttpMetadata(headers);
-    headers.set('etag', object.httpEtag);
-    headers.set('Cache-Control', 'public, max-age=31536000');
-    
-    return new Response(object.body, {
-      headers,
-    });
+
+    return c.json({ success: false, error: 'Image not found' }, 404);
   } catch (error) {
     console.error('Error fetching image:', error);
     return c.json({

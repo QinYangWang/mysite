@@ -12,7 +12,7 @@
 	"upload_source_maps": true,
 	"assets": {
 		"directory": "./dist/client",
-		"not_found_handling": "single-page-application"
+		"not_found_handling": "404-page"
 	},
 	"d1_databases": [
 		{
@@ -33,5 +33,8 @@
 			"binding": "ANALYTICS",
 			"dataset": "mysite_analytics"
 		}
-	]
+	],
+	"vars": {
+		"CF_ACCOUNT_ID": "74550e1c7a5a36e9cb05c5ad681add98"
+	}
 }

@@ -7,4 +7,5 @@ interface Env {
   DB: D1Database;
   ANALYTICS: AnalyticsEngineDataset;
   API_TOKEN: string;
+  ASSETS?: Fetcher;
 }

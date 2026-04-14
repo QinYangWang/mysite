@@ -1,20 +1,37 @@
 import matter from 'gray-matter';
 import type { BlogPost, BlogPostMeta, Frontmatter } from '../types';
 
+// 递归列出 R2 中所有 .md 文件
+async function listAllMarkdownFiles(bucket: R2Bucket, prefix: string): Promise<R2Object[]> {
+  const allObjects: R2Object[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const list = await bucket.list({
+      prefix,
+      limit: 1000,
+      cursor,
+    });
+
+    for (const obj of list.objects) {
+      if (obj.key.endsWith('.md')) {
+        allObjects.push(obj);
+      }
+    }
+
+    cursor = list.truncated ? list.cursor : undefined;
+  } while (cursor);
+
+  return allObjects;
+}
+
 // 从 R2 获取所有已发布的博客文章列表
-export async function getPublishedPosts(bucket: R2Bucket, limit: number = 20, cursor?: string): Promise<{ posts: BlogPostMeta[]; cursor?: string }> {
-  const list = await bucket.list({
-    prefix: 'posts/',
-    delimiter: '/',
-    limit: 100,
-    cursor,
-  });
+export async function getPublishedPosts(bucket: R2Bucket, limit: number = 20, _cursor?: string): Promise<{ posts: BlogPostMeta[]; cursor?: string }> {
+  const objects = await listAllMarkdownFiles(bucket, '');
 
   const posts: BlogPostMeta[] = [];
 
-  for (const object of list.objects) {
-    if (!object.key.endsWith('.md')) continue;
-
+  for (const object of objects) {
     const file = await bucket.get(object.key);
     if (!file) continue;
 
@@ -22,9 +39,10 @@ export async function getPublishedPosts(bucket: R2Bucket, limit: number = 20, cu
     const parsed = parseMarkdown(content);
 
     if (!parsed.frontmatter.publish) continue;
+    if (!parsed.frontmatter.slug) continue;
 
     posts.push({
-      slug: parsed.frontmatter.slug || generateSlug(object.key),
+      slug: parsed.frontmatter.slug,
       title: parsed.frontmatter.title || extractTitle(object.key),
       date: parsed.frontmatter.date || object.uploaded?.toISOString() || new Date().toISOString(),
       summary: parsed.frontmatter.summary || '',
@@ -38,34 +56,25 @@ export async function getPublishedPosts(bucket: R2Bucket, limit: number = 20, cu
 
   return {
     posts: posts.slice(0, limit),
-    cursor: list.truncated ? list.cursor : undefined,
+    cursor: undefined, // 已一次性获取所有文件
   };
 }
 
 // 获取单个博客详情
 export async function getPostBySlug(bucket: R2Bucket, slug: string): Promise<BlogPost | null> {
-  // 尝试查找匹配的 markdown 文件
-  const list = await bucket.list({
-    prefix: 'posts/',
-    limit: 1000,
-  });
+  const objects = await listAllMarkdownFiles(bucket, '');
 
-  for (const object of list.objects) {
-    if (!object.key.endsWith('.md')) continue;
-
+  for (const object of objects) {
     const file = await bucket.get(object.key);
     if (!file) continue;
 
     const content = await file.text();
     const parsed = parseMarkdown(content);
-    const postSlug = parsed.frontmatter.slug || generateSlug(object.key);
+    const postSlug = parsed.frontmatter.slug;
+
+    if (!postSlug || !parsed.frontmatter.publish) continue;
 
     if (postSlug === slug) {
-      // 检查是否发布
-      if (!parsed.frontmatter.publish) {
-        return null;
-      }
-
       return {
         slug: postSlug,
         title: parsed.frontmatter.title || extractTitle(object.key),
@@ -82,16 +91,24 @@ export async function getPostBySlug(bucket: R2Bucket, slug: string): Promise<Blo
   return null;
 }
 
-// 获取所有图片（仅已发布文章关联的图片）
+// 获取所有图片
 export async function getPublishedImages(bucket: R2Bucket, prefix: string = 'images/'): Promise<string[]> {
-  const list = await bucket.list({
-    prefix,
-    limit: 1000,
-  });
+  const allObjects: R2Object[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const list = await bucket.list({
+      prefix,
+      limit: 1000,
+      cursor,
+    });
+    allObjects.push(...list.objects);
+    cursor = list.truncated ? list.cursor : undefined;
+  } while (cursor);
 
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.avif'];
-  
-  return list.objects
+
+  return allObjects
     .filter((obj: R2Object) => {
       const ext = obj.key.substring(obj.key.lastIndexOf('.')).toLowerCase();
       return imageExtensions.includes(ext);
@@ -124,14 +141,11 @@ function normalizeTags(tags: string | string[] | undefined): string[] {
   return tags;
 }
 
-// 从文件名生成 slug
-function generateSlug(key: string): string {
-  const fileName = key.replace('posts/', '').replace('.md', '');
-  return fileName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-}
-
-// 从文件名提取标题
+// 从文件 key 提取标题
 function extractTitle(key: string): string {
-  const fileName = key.replace('posts/', '').replace('.md', '');
+  const fileName = key
+    .replace(/^posts\//, '')
+    .replace(/\.md$/, '')
+    .replace(/^.*\//, '');
   return fileName.replace(/[-_]/g, ' ');
 }

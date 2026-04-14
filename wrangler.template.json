@@ -33,5 +33,8 @@
 			"binding": "ANALYTICS",
 			"dataset": "mysite_analytics"
 		}
-	]
+	],
+	"vars": {
+		"CF_ACCOUNT_ID": ""
+	}
 }

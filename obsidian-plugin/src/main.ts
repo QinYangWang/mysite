@@ -478,7 +478,7 @@ export default class CloudflareSyncPlugin extends Plugin {
   }
 
   getRemoteKey(file: TFile): string {
-    return `vault/${file.path}`;
+    return file.path;
   }
 
   getMimeType(ext: string): string {
@@ -545,8 +545,7 @@ export default class CloudflareSyncPlugin extends Plugin {
   async syncFileFromRemote(remoteFile: { key: string }): Promise<void> {
     try {
       const data = await this.downloadFile(remoteFile.key);
-      // vault/notes/my-note.md -> notes/my-note.md
-      const localPath = data.key.replace(/^vault\//, '');
+      const localPath = data.key;
 
       const existingFile = this.app.vault.getAbstractFileByPath(localPath);
       const isMarkdown = localPath.endsWith('.md');
@@ -643,7 +642,7 @@ export default class CloudflareSyncPlugin extends Plugin {
 
     try {
       console.log('[Download] Listing remote files...');
-      const remoteFiles = await this.listFiles('vault/');
+      const remoteFiles = await this.listFiles('');
       console.log(`[Download] Found ${remoteFiles.length} remote files`);
 
       let synced = 0;

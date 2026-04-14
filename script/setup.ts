@@ -41,6 +41,31 @@ function run(command: string, options?: { silent?: boolean }): string {
   }
 }
 
+function getAccountId(): string | null {
+  const output = run('npx wrangler whoami', { silent: true });
+  const match = output.match(/([a-f0-9]{32})/i);
+  return match ? match[1] : null;
+}
+
+function updateDevVars(key: string, value: string): void {
+  const devVarsPath = path.join(rootDir, '.dev.vars');
+  let content = '';
+  if (fs.existsSync(devVarsPath)) {
+    content = fs.readFileSync(devVarsPath, 'utf-8');
+  }
+
+  const regex = new RegExp(`^${key}=.*$`, 'm');
+  const line = `${key}=${value}`;
+
+  if (regex.test(content)) {
+    content = content.replace(regex, line);
+  } else {
+    content = content.trimEnd() + '\n' + line + '\n';
+  }
+
+  fs.writeFileSync(devVarsPath, content);
+}
+
 // 读取模板配置
 const templatePath = path.join(rootDir, 'wrangler.template.json');
 const template = JSON.parse(
@@ -193,6 +218,15 @@ async function main() {
     createdResources.analytics = true;
   }
 
+  // 自动获取 Account ID
+  console.log('\n🔍 Detecting Cloudflare Account ID...');
+  let accountId = getAccountId();
+  if (!accountId) {
+    accountId = await ask('  Could not auto-detect Account ID. Please enter it: ');
+  } else {
+    console.log(`  ✅ Found Account ID: ${accountId}`);
+  }
+
   // 生成 wrangler.json
   console.log('\n📝 Generating wrangler.json...');
   const wranglerConfig = { ...template };
@@ -205,9 +239,21 @@ async function main() {
     }));
   }
 
+  // 写入 CF_ACCOUNT_ID
+  wranglerConfig.vars = {
+    ...(wranglerConfig.vars || {}),
+    CF_ACCOUNT_ID: accountId || '',
+  };
+
   const wranglerPath = path.join(rootDir, 'wrangler.json');
   fs.writeFileSync(wranglerPath, JSON.stringify(wranglerConfig, null, '\t'));
   console.log(`  ✅ Generated wrangler.json`);
+
+  // 同步 .dev.vars
+  if (accountId) {
+    updateDevVars('CF_ACCOUNT_ID', accountId);
+    console.log('  ✅ Updated .dev.vars with CF_ACCOUNT_ID');
+  }
 
   // 生成类型
   console.log('\n🔧 Generating TypeScript types...');
@@ -219,11 +265,18 @@ async function main() {
     await runMigrations(d1Config.database_name);
   }
 
-  // 提示设置 API_TOKEN secret
-  console.log('\n🔑 API_TOKEN Secret');
-  console.log('  The Obsidian plugin uses API_TOKEN for authentication.');
-  console.log('  Set it with: npx wrangler secret put API_TOKEN');
-  console.log('  (This should be a strong random string)');
+  // 提示设置 Secrets
+  console.log('\n🔑 Required Secrets');
+  console.log('  1) API_TOKEN');
+  console.log('     Used by the Obsidian plugin for authentication.');
+  console.log('     Set it with: npx wrangler secret put API_TOKEN');
+  console.log('     (This should be a strong random string)');
+  console.log('');
+  console.log('  2) CF_ANALYTICS_TOKEN');
+  console.log('     Used by the admin dashboard to query Analytics Engine.');
+  console.log('     Create a token with Account > Account Analytics > Read permission:');
+  console.log('     https://dash.cloudflare.com/profile/api-tokens');
+  console.log('     Set it with: npx wrangler secret put CF_ANALYTICS_TOKEN');
 
   // 总结
   console.log('\n' + '='.repeat(50));
@@ -232,11 +285,15 @@ async function main() {
   console.log(`  R2 bucket: ${createdResources.r2 ? '✅' : '⏭️  skipped'}`);
   console.log(`  D1 database: ${createdResources.d1 ? '✅' : '⏭️  skipped'}`);
   console.log(`  Analytics Engine: ${createdResources.analytics ? '✅' : '⏭️  skipped'}`);
+  if (accountId) {
+    console.log(`  CF_ACCOUNT_ID: ✅ ${accountId}`);
+  }
 
   console.log('\nNext steps:');
   console.log('  npm run dev       - Start local development');
   console.log('  npm run deploy    - Deploy to Cloudflare');
-  console.log('  npx wrangler secret put API_TOKEN  - (if skipped)');
+  console.log('  npx wrangler secret put API_TOKEN');
+  console.log('  npx wrangler secret put CF_ANALYTICS_TOKEN');
 
   rl.close();
 }

@@ -215,7 +215,7 @@ export class SyncEngine {
       }
 
       // 2. 批量获取远程文件元数据
-      const remoteMetas = await this.fetchRemoteMetas('vault/');
+      const remoteMetas = await this.fetchRemoteMetas('');
       const remoteMetaMap = new Map<string, RemoteFileMeta>();
       for (const meta of remoteMetas) {
         remoteMetaMap.set(meta.key, meta);
@@ -231,7 +231,7 @@ export class SyncEngine {
       for (const key of allKeys) {
         const local = localFileMap.get(key);
         const remote = remoteMetaMap.get(key);
-        const localPath = key.replace(/^vault\//, '');
+        const localPath = key;
         const savedState = this.syncStates[localPath];
 
         const localHash = local?.hash || null;
@@ -292,7 +292,7 @@ export class SyncEngine {
       for (const item of toUpload) {
         try {
           await this.plugin.syncFileToRemote(item.file);
-          const localPath = item.key.replace(/^vault\//, '');
+          const localPath = item.key;
           this.syncStates[localPath] = {
             remoteKey: item.key,
             lastSyncedHash: item.hash,
@@ -310,7 +310,7 @@ export class SyncEngine {
         try {
           const data = await this.downloadAndSave(item.key);
           if (data) {
-            const localPath = item.key.replace(/^vault\//, '');
+            const localPath = item.key;
             this.syncStates[localPath] = {
               remoteKey: item.key,
               lastSyncedHash: data.contentHash || '',
@@ -549,7 +549,7 @@ export class SyncEngine {
       }>(`/api/sync/download/${remoteKey}`);
 
       const data = res.data;
-      const localPath = data.key.replace(/^vault\//, '');
+      const localPath = data.key;
       const isMarkdown = localPath.endsWith('.md');
       const existingFile = this.plugin.app.vault.getAbstractFileByPath(localPath);
 

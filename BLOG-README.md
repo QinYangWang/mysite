@@ -97,7 +97,7 @@ npm run deploy
 
 ## R2 存储结构
 
-R2 bucket 中的文件按以下结构组织：
+R2 bucket 中的文件按以下结构组织。Markdown 文件按照其在 Obsidian 中的原始路径存储（无 `vault/` 前缀），图片统一存储在 `images/` 目录下：
 
 ```
 your-bucket/
@@ -118,7 +118,7 @@ your-bucket/
 ```yaml
 ---
 title: "文章标题"
-slug: "url-friendly-slug"
+slug: "url-friendly-slug"  # 必填，不能为空，文章访问路径为 /slug 的值
 date: "2024-01-01T00:00:00.000Z"
 summary: "文章摘要"
 tags:
@@ -130,6 +130,8 @@ coverImage: "cover.jpg"  # 可选
 
 文章内容...
 ```
+
+> **注意**：`slug` 字段必须非空，发布后的文章可通过 `https://your-domain.com/<slug>` 直接访问。
 
 ## Obsidian 插件使用
 

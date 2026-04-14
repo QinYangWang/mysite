@@ -50,14 +50,13 @@ commentsAPI.post('/:slug', async (c) => {
     
     // 检查文章是否存在且已发布
     const post = await c.env.BUCKET.list({
-      prefix: 'posts/',
       limit: 1000,
     });
-    
+
     let postExists = false;
     for (const object of post.objects) {
       if (!object.key.endsWith('.md')) continue;
-      
+
       const file = await c.env.BUCKET.get(object.key);
       if (file) {
         const content = await file.text();

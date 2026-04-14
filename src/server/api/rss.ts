@@ -24,7 +24,7 @@ async function generateRSS(bucket: Env['BUCKET']) {
     feed.item({
       title: post.title,
       description: post.summary,
-      url: `https://mysite.com/posts/${post.slug}`,
+      url: `https://mysite.com/${post.slug}`,
       categories: post.tags,
       date: new Date(post.date),
     });
