@@ -205,9 +205,11 @@ export class SyncEngine {
       const localFileMap = new Map<string, { file: TFile; hash: string }>();
       for (const file of localFiles) {
         const remoteKey = this.plugin.getRemoteKey(file);
-        const content = file.path.endsWith('.md')
+        const isMarkdown = file.path.endsWith('.md');
+        // 对 text 文件 hash 字符串，对二进制文件 hash 原始 ArrayBuffer（与服务端一致）
+        const content: string | ArrayBuffer = isMarkdown
           ? await this.plugin.app.vault.read(file)
-          : this.plugin.arrayBufferToBase64(await this.plugin.app.vault.readBinary(file));
+          : await this.plugin.app.vault.readBinary(file);
         const hash = await this.computeLocalHash(content);
         localFileMap.set(remoteKey, { file, hash });
       }
@@ -375,11 +377,11 @@ export class SyncEngine {
       const remoteKey = this.plugin.getRemoteKey(file);
       const localPath = file.path;
 
-      // 获取本地 hash
+      // 获取本地 hash（text hash 字符串，binary hash 原始 ArrayBuffer，与服务端一致）
       const isMarkdown = file.path.endsWith('.md');
-      const content = isMarkdown
+      const content: string | ArrayBuffer = isMarkdown
         ? await this.plugin.app.vault.read(file)
-        : this.plugin.arrayBufferToBase64(await this.plugin.app.vault.readBinary(file));
+        : await this.plugin.app.vault.readBinary(file);
       const localHash = await this.computeLocalHash(content);
 
       // 获取远程 hash

@@ -95,6 +95,12 @@ export default class CloudflareSyncPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: 'generate-all-frontmatter',
+      name: 'Generate frontmatter for all markdown files',
+      callback: () => this.generateAllFrontmatter(),
+    });
+
+    this.addCommand({
       id: 'sync-current-file',
       name: 'Sync current file to Cloudflare',
       editorCallback: () => this.syncCurrentFile(),
@@ -151,6 +157,14 @@ export default class CloudflareSyncPlugin extends Plugin {
       setTimeout(() => {
         this.triggerFullSync();
       }, 3000);
+    }
+
+    // 启动时扫描所有 md 文件，自动补全缺失的 frontmatter
+    if (this.settings.autoFrontmatter) {
+      // 延迟 2 秒等待 vault 完全加载
+      setTimeout(() => {
+        this.scanAndGenerateFrontmatter();
+      }, 2000);
     }
 
     console.log('Cloudflare Sync plugin loaded');
@@ -317,17 +331,21 @@ export default class CloudflareSyncPlugin extends Plugin {
     return firstParagraph.replace(/[#*`_\[\]]/g, '').substring(0, 200);
   }
 
-  async updateFileFrontmatter(file: TFile): Promise<void> {
-    if (!file.path.endsWith('.md')) return;
+  async updateFileFrontmatter(file: TFile, silent = false): Promise<boolean> {
+    if (!file.path.endsWith('.md')) return false;
 
     const content = await this.app.vault.read(file);
-    if (content.startsWith('---')) return;
+    // 如果已有 frontmatter，跳过（仅为缺失的文件生成）
+    if (content.startsWith('---')) return false;
 
     const frontmatter = await this.generateFrontmatter(file);
     const newContent = matter.stringify(content, frontmatter);
     await this.app.vault.modify(file, newContent);
 
-    new Notice(`Updated frontmatter for ${file.name}`);
+    if (!silent) {
+      new Notice(`Updated frontmatter for ${file.name}`);
+    }
+    return true;
   }
 
   async updateCurrentFileFrontmatter(editor: any): Promise<void> {
@@ -343,6 +361,102 @@ export default class CloudflareSyncPlugin extends Plugin {
 
     editor.setValue(newContent);
     new Notice('Updated frontmatter');
+  }
+
+  /**
+   * 扫描所有 md 文件，确保每个文件都有完整的 frontmatter
+   * 统一处理三种情况：
+   * 1. 完全没有 frontmatter → 生成全部字段
+   * 2. 有部分 frontmatter（缺少某些字段）→ 补全缺失字段
+   * 3. 已有完整 frontmatter → 跳过
+   */
+  async scanAndGenerateFrontmatter(): Promise<void> {
+    const files = this.app.vault.getFiles().filter(
+      (f) => f.path.endsWith('.md') && this.shouldSyncFile(f.path)
+    );
+
+    let generated = 0;
+    const requiredFields = ['title', 'slug', 'date', 'summary', 'tags', 'publish'] as const;
+
+    console.log(`[Frontmatter] Scanning ${files.length} markdown files...`);
+
+    for (const file of files) {
+      try {
+        const content = await this.app.vault.read(file);
+
+        // gray-matter 统一解析：无论有没有 --- 都能正确解析
+        // 没有 frontmatter → data={}, content=原始内容
+        // 有 frontmatter → data={已有字段}, content=正文
+        const parsed = matter(content);
+
+        // 生成默认值
+        const defaults: Record<string, any> = {
+          title: file.basename,
+          slug: this.generateSlug(file.basename),
+          date: new Date(file.stat.ctime).toISOString(),
+          summary: this.extractSummary(parsed.content),
+          tags: [],
+          publish: false,
+        };
+
+        // 检查哪些必要字段缺失
+        let changed = false;
+        for (const field of requiredFields) {
+          if (parsed.data[field] === undefined || parsed.data[field] === null) {
+            parsed.data[field] = defaults[field];
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          // 用 gray-matter 重新序列化（自动添加 --- 分隔符）
+          const newContent = matter.stringify(parsed.content, parsed.data);
+          await this.app.vault.modify(file, newContent);
+          generated++;
+          console.log(`[Frontmatter] ✅ ${file.path} — added missing fields`);
+        }
+      } catch (err: any) {
+        console.error(`[Frontmatter] ❌ Failed for ${file.path}:`, err.message);
+      }
+    }
+
+    if (generated > 0) {
+      new Notice(`✅ Generated/updated frontmatter for ${generated} file(s)`);
+    }
+    console.log(`[Frontmatter] Done: ${generated}/${files.length} files updated`);
+  }
+
+  /**
+   * 为所有 md 文件强制生成/更新 frontmatter（包括已有 frontmatter 的文件）
+   */
+  async generateAllFrontmatter(): Promise<void> {
+    const files = this.app.vault.getFiles().filter(
+      (f) => f.path.endsWith('.md') && this.shouldSyncFile(f.path)
+    );
+
+    let updated = 0;
+    new Notice(`Generating frontmatter for ${files.length} files...`);
+
+    for (const file of files) {
+      try {
+        const content = await this.app.vault.read(file);
+        const frontmatter = await this.generateFrontmatter(file);
+        const newContent = matter.stringify(
+          matter(content).content, // 去掉旧 frontmatter，用新的替换
+          frontmatter
+        );
+
+        // 仅在内容实际变化时写入
+        if (content !== newContent) {
+          await this.app.vault.modify(file, newContent);
+          updated++;
+        }
+      } catch (err: any) {
+        console.error(`[Frontmatter] Failed for ${file.path}:`, err.message);
+      }
+    }
+
+    new Notice(`✅ Updated frontmatter for ${updated}/${files.length} files`);
   }
 
   // ========== 同步逻辑 ==========
