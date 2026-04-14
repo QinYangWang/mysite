@@ -30,8 +30,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: 0px;
-  --radius-md: 4px;
+  --radius-sm: 3px;
+  --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 8px;
   --radius-2xl: 8px;
@@ -45,45 +45,80 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Space Mono", ui-monospace, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
 :root {
-  --radius: 0px;
-  /* Nothing Design — OLED Black */
-  --background: #000000;
+  --radius: 6px;
+  /* Notion Style — Light */
+  --background: #ffffff;
+  --foreground: #37352f;
+  --card: #ffffff;
+  --card-foreground: #37352f;
+  --popover: #ffffff;
+  --popover-foreground: #37352f;
+  --primary: #37352f;
+  --primary-foreground: #ffffff;
+  --secondary: #f7f6f3;
+  --secondary-foreground: #37352f;
+  --muted: #f7f6f3;
+  --muted-foreground: #9b9a97;
+  --accent: #f7f6f3;
+  --accent-foreground: #37352f;
+  --destructive: #eb5757;
+  --destructive-foreground: #ffffff;
+  --border: rgba(55, 53, 47, 0.16);
+  --input: rgba(55, 53, 47, 0.16);
+  --ring: rgb(35, 131, 226);
+  --chart-1: #37352f;
+  --chart-2: #9b9a97;
+  --chart-3: #d1d1d1;
+  --chart-4: #eb5757;
+  --chart-5: #f7f6f3;
+  --sidebar: #f7f6f3;
+  --sidebar-foreground: #37352f;
+  --sidebar-primary: #37352f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(55, 53, 47, 0.08);
+  --sidebar-accent-foreground: #37352f;
+  --sidebar-border: rgba(55, 53, 47, 0.09);
+  --sidebar-ring: rgb(35, 131, 226);
+}
+
+:root[data-theme="dark"] {
+  --background: #191919;
   --foreground: rgba(255, 255, 255, 0.9);
-  --card: #000000;
+  --card: #191919;
   --card-foreground: rgba(255, 255, 255, 0.9);
-  --popover: #000000;
+  --popover: #191919;
   --popover-foreground: rgba(255, 255, 255, 0.9);
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-  --secondary: rgba(255, 255, 255, 0.08);
+  --primary: rgba(255, 255, 255, 0.9);
+  --primary-foreground: #191919;
+  --secondary: #202020;
   --secondary-foreground: rgba(255, 255, 255, 0.9);
-  --muted: rgba(255, 255, 255, 0.08);
-  --muted-foreground: rgba(255, 255, 255, 0.6);
-  --accent: #D71921;
-  --accent-foreground: #ffffff;
-  --destructive: #D71921;
+  --muted: #202020;
+  --muted-foreground: #737373;
+  --accent: #202020;
+  --accent-foreground: rgba(255, 255, 255, 0.9);
+  --destructive: #ff6b6b;
   --destructive-foreground: #ffffff;
   --border: rgba(255, 255, 255, 0.12);
   --input: rgba(255, 255, 255, 0.12);
-  --ring: rgba(255, 255, 255, 0.4);
-  --chart-1: #ffffff;
-  --chart-2: rgba(255, 255, 255, 0.6);
-  --chart-3: rgba(255, 255, 255, 0.3);
-  --chart-4: #D71921;
-  --chart-5: rgba(255, 255, 255, 0.5);
-  --sidebar: #000000;
+  --ring: rgb(46, 170, 220);
+  --chart-1: rgba(255, 255, 255, 0.9);
+  --chart-2: #737373;
+  --chart-3: #505050;
+  --chart-4: #ff6b6b;
+  --chart-5: #202020;
+  --sidebar: #202020;
   --sidebar-foreground: rgba(255, 255, 255, 0.9);
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #000000;
+  --sidebar-primary: rgba(255, 255, 255, 0.9);
+  --sidebar-primary-foreground: #191919;
   --sidebar-accent: rgba(255, 255, 255, 0.08);
   --sidebar-accent-foreground: rgba(255, 255, 255, 0.9);
-  --sidebar-border: rgba(255, 255, 255, 0.12);
-  --sidebar-ring: rgba(255, 255, 255, 0.4);
+  --sidebar-border: rgba(255, 255, 255, 0.09);
+  --sidebar-ring: rgb(46, 170, 220);
 }
 
 @layer base {
@@ -92,89 +127,113 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   }
 }
 
-/* Nothing Design — Typography utilities */
-.font-doto {
-  font-family: "Doto", ui-monospace, monospace;
-}
+/* Notion Design — Typography utilities */
 .font-mono {
-  font-family: "Space Mono", ui-monospace, monospace;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
 .text-display {
-  color: rgba(255, 255, 255, 1);
+  color: var(--foreground);
 }
 .text-primary {
+  color: rgba(55, 53, 47, 0.9);
+}
+:root[data-theme="dark"] .text-primary {
   color: rgba(255, 255, 255, 0.9);
 }
 .text-secondary {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--muted-foreground);
 }
 .text-disabled {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(55, 53, 47, 0.4);
+}
+:root[data-theme="dark"] .text-disabled {
+  color: rgba(255, 255, 255, 0.35);
 }
 
 /* Prose overrides for markdown content */
 .prose-custom {
-  @apply prose prose-invert max-w-none;
+  @apply prose max-w-none;
 }
 .prose-custom h1,
 .prose-custom h2,
 .prose-custom h3,
 .prose-custom h4 {
-  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  color: var(--foreground);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.25em;
 }
+.prose-custom h1 { font-size: 1.875rem; }
+.prose-custom h2 { font-size: 1.5rem; }
+.prose-custom h3 { font-size: 1.25rem; }
 .prose-custom p,
 .prose-custom li {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--foreground);
+  line-height: 1.6;
+}
+.prose-custom ul > li,
+.prose-custom ol > li {
+  padding-left: 0.5em;
+}
+.prose-custom ul > li::marker {
+  color: var(--foreground);
 }
 .prose-custom pre {
-  @apply rounded-none border border-white/10 bg-white/[0.03] p-4;
-  font-family: "Space Mono", ui-monospace, monospace;
+  @apply rounded-[3px] border p-4;
+  border-color: var(--border);
+  background: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 .prose-custom code {
-  @apply rounded-none border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-sm;
-  font-family: "Space Mono", ui-monospace, monospace;
+  @apply rounded-[3px] px-1.5 py-0.5 text-sm;
+  background: var(--muted);
+  color: var(--destructive);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 .prose-custom blockquote {
-  @apply border-l border-white/20 pl-4 italic;
-  color: rgba(255, 255, 255, 0.6);
+  @apply border-l-4 pl-4 italic;
+  border-color: var(--border);
+  color: var(--muted-foreground);
 }
 .prose-custom a {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--foreground);
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: rgba(255, 255, 255, 0.3);
+  text-decoration-color: rgba(55, 53, 47, 0.25);
+}
+:root[data-theme="dark"] .prose-custom a {
+  text-decoration-color: rgba(255, 255, 255, 0.25);
 }
 .prose-custom a:hover {
-  text-decoration-color: rgba(255, 255, 255, 0.8);
+  text-decoration-color: rgba(55, 53, 47, 0.6);
+}
+:root[data-theme="dark"] .prose-custom a:hover {
+  text-decoration-color: rgba(255, 255, 255, 0.5);
 }
 .prose-custom img {
-  @apply border border-white/10;
+  @apply rounded-[3px];
+  border: 1px solid var(--border);
 }
 .prose-custom hr {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--border);
 }
 .prose-custom table {
   border-collapse: collapse;
 }
 .prose-custom th,
 .prose-custom td {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border);
   padding: 0.5rem 0.75rem;
 }
 .prose-custom th {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.9);
-  font-family: "Space Mono", ui-monospace, monospace;
-  font-weight: 400;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
+  background: var(--muted);
+  color: var(--foreground);
+  font-weight: 500;
+  font-size: 0.875rem;
 }

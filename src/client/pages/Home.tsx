@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface PostMeta {
@@ -52,16 +51,16 @@ function Home() {
 
   if (loading) {
     return (
-      <div className="space-y-20">
-        <div className="space-y-4">
-          <Skeleton className="h-16 w-48" />
-          <Skeleton className="h-5 w-80" />
+      <div className="space-y-12">
+        <div className="space-y-3">
+          <Skeleton className="h-12 w-40" />
+          <Skeleton className="h-5 w-72" />
         </div>
-        <div className="space-y-16">
+        <div className="space-y-10">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="space-y-4 pb-16 border-b border-white/10">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-4 w-32" />
+            <div key={i} className="space-y-3 pb-10 border-b border-[rgba(55,53,47,0.09)]">
+              <Skeleton className="h-7 w-3/4" />
+              <Skeleton className="h-4 w-28" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-2/3" />
             </div>
@@ -74,50 +73,56 @@ function Home() {
   if (error) {
     return (
       <div className="py-24 text-center">
-        <p className="font-mono text-sm uppercase tracking-wider text-[#D71921]">
-          Error: {error}
+        <p className="text-sm text-[#eb5757]">
+          出现错误：{error}
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-24">
-      <div className="space-y-4">
-        <h1 className="text-5xl font-medium tracking-tight text-white sm:text-6xl">
+    <div className="space-y-10">
+      {/* Page Header */}
+      <div className="space-y-2">
+        <div className="text-4xl mb-3">📚</div>
+        <h1 className="text-[2.5rem] font-semibold tracking-tight text-[#37352f]">
           博客
         </h1>
-        <p className="text-lg text-white/60 max-w-md">
+        <p className="text-base text-[#9b9a97] max-w-md">
           记录思考、分享技术与生活。
         </p>
       </div>
 
+      {/* Posts List */}
       <div className="space-y-0">
         {posts.map((post) => (
           <article
             key={post.slug}
-            className="py-12 border-b border-white/10 first:pt-0"
+            className="py-8 border-b border-[rgba(55,53,47,0.09)] first:pt-0 group"
           >
-            <Link to={`/${post.slug}`} className="group block space-y-4">
-              <h2 className="text-2xl font-medium tracking-tight text-white transition-colors group-hover:text-white/70 sm:text-3xl">
+            <Link to={`/${post.slug}`} className="block space-y-3">
+              <h2 className="text-xl font-medium text-[#37352f] transition-colors group-hover:text-[#9b9a97] sm:text-[1.375rem]">
                 {post.title}
               </h2>
-              <div className="flex flex-wrap items-center gap-3 text-xs font-mono uppercase tracking-wider text-white/40">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-[#9b9a97]">
                 <time>{new Date(post.date).toLocaleDateString('zh-CN')}</time>
                 {post.tags.length > 0 && (
                   <>
                     <span>·</span>
                     <div className="flex flex-wrap items-center gap-2">
                       {post.tags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-[10px]">
+                        <span
+                          key={tag}
+                          className="px-2 py-0.5 text-xs rounded-[3px] bg-[#f7f6f3] text-[#37352f]"
+                        >
                           {tag}
-                        </Badge>
+                        </span>
                       ))}
                     </div>
                   </>
                 )}
               </div>
-              <p className="text-base text-white/60 leading-relaxed max-w-xl">
+              <p className="text-[#37352f]/80 leading-relaxed max-w-xl">
                 {post.summary}
               </p>
             </Link>
@@ -126,7 +131,8 @@ function Home() {
 
         {posts.length === 0 && (
           <div className="py-24 text-center">
-            <p className="font-mono text-sm uppercase tracking-wider text-white/40">
+            <div className="text-4xl mb-3">📝</div>
+            <p className="text-sm text-[#9b9a97]">
               暂无文章
             </p>
           </div>

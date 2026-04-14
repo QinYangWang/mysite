@@ -1,9 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import {
-  CheckCircle2,
-  AlertCircle,
-  Lock,
-} from 'lucide-react';
+import { CheckCircle2, AlertCircle, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -67,7 +63,7 @@ function formatNumber(n: number) {
   return n.toLocaleString('zh-CN');
 }
 
-const AUTH_KEY = 'admin_api_token';
+const AUTH_KEY='***';
 
 function getStoredToken(): string | null {
   return sessionStorage.getItem(AUTH_KEY);
@@ -255,8 +251,8 @@ function Admin() {
   }, [timeseries]);
 
   const chartConfig = {
-    pv: { label: '浏览量', color: 'rgba(255,255,255,0.9)' },
-    uv: { label: '访客数', color: 'rgba(255,255,255,0.4)' },
+    pv: { label: '浏览量', color: '#37352f' },
+    uv: { label: '访客数', color: '#9b9a97' },
   } satisfies ChartConfig;
 
   const StatCard = ({
@@ -268,17 +264,15 @@ function Admin() {
     value: number;
     loading: boolean;
   }) => (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {loading ? (
-        <Skeleton className="h-14 w-28" />
+        <Skeleton className="h-10 w-28" />
       ) : (
-        <p className="font-doto text-4xl font-bold tracking-tight text-white sm:text-5xl">
+        <p className="text-3xl font-semibold tracking-tight text-[#37352f] sm:text-4xl">
           {formatNumber(value)}
         </p>
       )}
-      <p className="text-[11px] font-mono uppercase tracking-wider text-white/40">
-        {title}
-      </p>
+      <p className="text-sm text-[#9b9a97]">{title}</p>
     </div>
   );
 
@@ -291,11 +285,9 @@ function Admin() {
     children: React.ReactNode;
     loading?: boolean;
   }) => (
-    <Card className="border-white/10 bg-black">
+    <Card className="border-[rgba(55,53,47,0.16)] bg-white shadow-none">
       <CardHeader className="pb-3">
-        <CardTitle className="text-xs font-mono uppercase tracking-wider text-white/60">
-          {title}
-        </CardTitle>
+        <CardTitle className="text-sm font-medium text-[#9b9a97]">{title}</CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
         {loading ? (
@@ -314,20 +306,18 @@ function Admin() {
   if (!isAuthenticated) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Card className="w-full max-w-sm border-white/10 bg-black">
+        <Card className="w-full max-w-sm border-[rgba(55,53,47,0.16)] bg-white shadow-none">
           <CardContent className="p-8">
             <div className="mb-8 flex flex-col items-center text-center">
-              <div className="mb-5 border border-white/15 p-4 text-white">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-[6px] border border-[rgba(55,53,47,0.16)] text-[#37352f]">
                 <Lock className="h-5 w-5" />
               </div>
-              <h2 className="text-lg font-medium tracking-tight text-white">管理后台</h2>
-              <p className="text-xs font-mono uppercase tracking-wider text-white/40 mt-1">
-                Enter API Token
-              </p>
+              <h2 className="text-lg font-medium text-[#37352f]">管理后台</h2>
+              <p className="text-sm text-[#9b9a97] mt-1">请输入 API Token 登录</p>
             </div>
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="api-token" className="text-xs font-mono uppercase tracking-wider text-white/50">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="api-token" className="text-sm text-[#37352f]">
                   API Token
                 </Label>
                 <Input
@@ -340,9 +330,7 @@ function Admin() {
                 />
               </div>
               {authError && (
-                <p className="font-mono text-xs uppercase tracking-wider text-[#D71921]">
-                  {authError}
-                </p>
+                <p className="text-sm text-[#eb5757]">{authError}</p>
               )}
               <Button type="submit" className="w-full" disabled={authLoading}>
                 {authLoading ? '验证中...' : '进入'}
@@ -355,13 +343,11 @@ function Admin() {
   }
 
   return (
-    <div className="space-y-16">
-      <div className="flex items-center justify-between border-b border-white/10 pb-6">
+    <div className="space-y-10">
+      <div className="flex items-center justify-between border-b border-[rgba(55,53,47,0.09)] pb-4">
         <div>
-          <h1 className="text-3xl font-medium tracking-tight text-white sm:text-4xl">管理后台</h1>
-          <p className="text-xs font-mono uppercase tracking-wider text-white/40 mt-2">
-            Analytics & Comments
-          </p>
+          <h1 className="text-[1.875rem] font-semibold tracking-tight text-[#37352f] sm:text-[2rem]">管理后台</h1>
+          <p className="text-sm text-[#9b9a97] mt-1">数据统计与评论管理</p>
         </div>
         <Button variant="outline" size="sm" onClick={handleLogout}>
           退出
@@ -369,18 +355,18 @@ function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-        <TabsList className="grid w-full max-w-sm grid-cols-2 border-white/10 bg-white/[0.03]">
-          <TabsTrigger value="dashboard" className="gap-2 text-xs font-mono uppercase tracking-wider">
+        <TabsList className="grid w-full max-w-xs grid-cols-2 border-[rgba(55,53,47,0.16)] bg-[#f7f6f3]">
+          <TabsTrigger value="dashboard">
             仪表盘
           </TabsTrigger>
-          <TabsTrigger value="comments" className="gap-2 text-xs font-mono uppercase tracking-wider">
+          <TabsTrigger value="comments">
             评论
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="mt-8 space-y-12">
+        <TabsContent value="dashboard" className="mt-6 space-y-8">
           {statsError && (
-            <div className="flex items-start gap-3 border border-[#D71921]/30 bg-[#D71921]/10 px-4 py-3 text-[#D71921]">
+            <div className="flex items-start gap-3 rounded-[3px] border border-[#eb5757]/30 bg-[#eb5757]/10 px-4 py-3 text-[#eb5757]">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <div className="text-sm">
                 <p className="font-medium">分析数据暂时不可用</p>
@@ -391,25 +377,23 @@ function Admin() {
             </div>
           )}
 
-          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard title="总浏览量 (30天)" value={stats.totalPv} loading={statsLoading} />
             <StatCard title="总访客数 (30天)" value={stats.totalUv} loading={statsLoading} />
             <StatCard title="今日浏览量" value={stats.todayPv} loading={statsLoading} />
             <StatCard title="评论总数" value={stats.commentCount} loading={commentsLoading} />
           </div>
 
-          <Card className="border-white/10 bg-black">
+          <Card className="border-[rgba(55,53,47,0.16)] bg-white shadow-none">
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-mono uppercase tracking-wider text-white/60">
-                访问趋势 (30天)
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-[#9b9a97]">访问趋势 (30天)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-56 w-full sm:h-64">
                 {statsLoading ? (
                   <Skeleton className="h-full w-full" />
                 ) : chartData.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-xs font-mono uppercase tracking-wider text-white/40">
+                  <div className="flex h-full items-center justify-center text-sm text-[#9b9a97]">
                     暂无趋势数据
                   </div>
                 ) : (
@@ -417,32 +401,30 @@ function Admin() {
                     <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                       <defs>
                         <linearGradient id="fillPv" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--color-pv)" stopOpacity={0.2} />
+                          <stop offset="5%" stopColor="var(--color-pv)" stopOpacity={0.15} />
                           <stop offset="95%" stopColor="var(--color-pv)" stopOpacity={0.02} />
                         </linearGradient>
                         <linearGradient id="fillUv" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--color-uv)" stopOpacity={0.2} />
+                          <stop offset="5%" stopColor="var(--color-uv)" stopOpacity={0.15} />
                           <stop offset="95%" stopColor="var(--color-uv)" stopOpacity={0.02} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.08)" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(55,53,47,0.08)" />
                       <XAxis
                         dataKey="date"
                         tickLine={false}
                         axisLine={false}
                         tickMargin={8}
                         minTickGap={24}
-                        stroke="rgba(255,255,255,0.4)"
+                        stroke="#9b9a97"
                         fontSize={11}
-                        fontFamily="Space Mono, monospace"
                       />
                       <YAxis
                         tickLine={false}
                         axisLine={false}
                         tickMargin={8}
-                        stroke="rgba(255,255,255,0.4)"
+                        stroke="#9b9a97"
                         fontSize={11}
-                        fontFamily="Space Mono, monospace"
                       />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <Area
@@ -466,18 +448,18 @@ function Admin() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3">
             <SectionCard title="热门页面" loading={statsLoading}>
               <div className="space-y-3">
                 {topPages.length === 0 ? (
-                  <p className="text-xs font-mono uppercase tracking-wider text-white/40">暂无数据</p>
+                  <p className="text-sm text-[#9b9a97]">暂无数据</p>
                 ) : (
                   topPages.map((p, i) => (
                     <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="truncate pr-4 text-white/60" title={p.path}>
+                      <span className="truncate pr-4 text-[#37352f]/70" title={p.path}>
                         {p.path || '/'}
                       </span>
-                      <span className="font-mono text-xs text-white/90">{formatNumber(p.views)}</span>
+                      <span className="text-xs font-medium text-[#37352f]">{formatNumber(p.views)}</span>
                     </div>
                   ))
                 )}
@@ -487,12 +469,12 @@ function Admin() {
             <SectionCard title="国家分布" loading={statsLoading}>
               <div className="space-y-3">
                 {countries.length === 0 ? (
-                  <p className="text-xs font-mono uppercase tracking-wider text-white/40">暂无数据</p>
+                  <p className="text-sm text-[#9b9a97]">暂无数据</p>
                 ) : (
                   countries.map((c, i) => (
                     <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="truncate pr-4 text-white/60">{c.country}</span>
-                      <span className="font-mono text-xs text-white/90">{formatNumber(c.views)}</span>
+                      <span className="truncate pr-4 text-[#37352f]/70">{c.country}</span>
+                      <span className="text-xs font-medium text-[#37352f]">{formatNumber(c.views)}</span>
                     </div>
                   ))
                 )}
@@ -502,12 +484,12 @@ function Admin() {
             <SectionCard title="设备分布" loading={statsLoading}>
               <div className="space-y-3">
                 {devices.length === 0 ? (
-                  <p className="text-xs font-mono uppercase tracking-wider text-white/40">暂无数据</p>
+                  <p className="text-sm text-[#9b9a97]">暂无数据</p>
                 ) : (
                   devices.map((d, i) => (
                     <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="truncate pr-4 text-white/60">{d.device}</span>
-                      <span className="font-mono text-xs text-white/90">{formatNumber(d.views)}</span>
+                      <span className="truncate pr-4 text-[#37352f]/70">{d.device}</span>
+                      <span className="text-xs font-medium text-[#37352f]">{formatNumber(d.views)}</span>
                     </div>
                   ))
                 )}
@@ -516,13 +498,11 @@ function Admin() {
           </div>
         </TabsContent>
 
-        <TabsContent value="comments" className="mt-8 space-y-4">
-          <Card className="border-white/10 bg-black">
+        <TabsContent value="comments" className="mt-6 space-y-4">
+          <Card className="border-[rgba(55,53,47,0.16)] bg-white shadow-none">
             <CardHeader>
-              <CardTitle className="text-xs font-mono uppercase tracking-wider text-white/60">
-                评论列表
-              </CardTitle>
-              <CardDescription>审核并管理所有评论</CardDescription>
+              <CardTitle className="text-sm font-medium text-[#9b9a97]">评论列表</CardTitle>
+              <CardDescription className="text-[#37352f]/60">审核并管理所有评论</CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto p-0">
               {commentsLoading ? (
@@ -532,32 +512,32 @@ function Admin() {
                   <Skeleton className="h-4 w-4/6" />
                 </div>
               ) : comments.length === 0 ? (
-                <div className="px-6 py-12 text-center text-xs font-mono uppercase tracking-wider text-white/40">
+                <div className="px-6 py-12 text-center text-sm text-[#9b9a97]">
                   暂无评论
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-14">ID</TableHead>
-                      <TableHead>内容</TableHead>
-                      <TableHead>文章</TableHead>
-                      <TableHead>邮箱</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead>时间</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
+                      <TableHead className="w-14 text-[#9b9a97]">ID</TableHead>
+                      <TableHead className="text-[#9b9a97]">内容</TableHead>
+                      <TableHead className="text-[#9b9a97]">文章</TableHead>
+                      <TableHead className="text-[#9b9a97]">邮箱</TableHead>
+                      <TableHead className="text-[#9b9a97]">状态</TableHead>
+                      <TableHead className="text-[#9b9a97]">时间</TableHead>
+                      <TableHead className="text-right text-[#9b9a97]">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {comments.map((comment) => (
                       <TableRow key={comment.id}>
-                        <TableCell className="text-white/40 font-mono text-xs">{comment.id}</TableCell>
-                        <TableCell className="max-w-xs truncate">{comment.content}</TableCell>
-                        <TableCell className="text-white/60 font-mono text-xs">{comment.post_slug}</TableCell>
-                        <TableCell className="text-white/60 font-mono text-xs">{comment.email}</TableCell>
+                        <TableCell className="text-[#9b9a97] font-mono text-xs">{comment.id}</TableCell>
+                        <TableCell className="max-w-xs truncate text-[#37352f]">{comment.content}</TableCell>
+                        <TableCell className="text-[#9b9a97] text-xs">{comment.post_slug}</TableCell>
+                        <TableCell className="text-[#9b9a97] text-xs">{comment.email}</TableCell>
                         <TableCell>
                           {comment.approved === 1 ? (
-                            <Badge variant="outline" className="gap-1 font-normal text-[10px]">
+                            <Badge variant="outline" className="gap-1 font-normal text-[10px] border-[rgba(55,53,47,0.16)] text-[#37352f]">
                               <CheckCircle2 className="h-3 w-3" />
                               已通过
                             </Badge>
@@ -568,7 +548,7 @@ function Admin() {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-white/60 font-mono text-xs">
+                        <TableCell className="text-[#9b9a97] text-xs">
                           {new Date(comment.created_at).toLocaleDateString('zh-CN')}
                         </TableCell>
                         <TableCell className="text-right">

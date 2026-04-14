@@ -77,17 +77,17 @@ function Comments({ slug }: CommentsProps) {
   };
 
   return (
-    <section className="space-y-12">
-      <div className="space-y-2">
-        <h3 className="text-lg font-medium tracking-tight">评论</h3>
-        <p className="text-xs font-mono uppercase tracking-wider text-white/40">
-          {comments.length} COMMENTS
+    <section className="space-y-10">
+      <div className="space-y-1">
+        <h3 className="text-lg font-medium text-[#37352f]">评论</h3>
+        <p className="text-sm text-[#9b9a97]">
+          共 {comments.length} 条评论
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5 max-w-lg">
-        <div className="space-y-2">
-          <Label htmlFor="comment-email" className="text-xs font-mono uppercase tracking-wider text-white/50">
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
+        <div className="space-y-1.5">
+          <Label htmlFor="comment-email" className="text-sm text-[#37352f]">
             Email
           </Label>
           <Input
@@ -99,9 +99,9 @@ function Comments({ slug }: CommentsProps) {
             required
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="comment-content" className="text-xs font-mono uppercase tracking-wider text-white/50">
-            Comment
+        <div className="space-y-1.5">
+          <Label htmlFor="comment-content" className="text-sm text-[#37352f]">
+            评论内容
           </Label>
           <Textarea
             id="comment-content"
@@ -116,30 +116,30 @@ function Comments({ slug }: CommentsProps) {
 
         {message && (
           <div
-            className={`font-mono text-xs uppercase tracking-wider ${
+            className={`text-sm ${
               message.includes('提交') && !message.includes('失败')
-                ? 'text-white/70'
-                : 'text-[#D71921]'
+                ? 'text-[#37352f]/70'
+                : 'text-[#eb5757]'
             }`}
           >
             {message}
           </div>
         )}
 
-        <Button type="submit" disabled={submitting} className="rounded-none">
+        <Button type="submit" disabled={submitting}>
           <Send className="mr-2 h-4 w-4" />
           {submitting ? '提交中...' : '提交评论'}
         </Button>
       </form>
 
       {loading ? (
-        <p className="text-xs font-mono uppercase tracking-wider text-white/40">加载评论中...</p>
+        <p className="text-sm text-[#9b9a97]">加载评论中...</p>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {comments.map((comment) => (
-            <div key={comment.id} className="space-y-2">
-              <p className="text-base text-white/90 leading-relaxed">{comment.content}</p>
-              <div className="flex items-center gap-3 text-xs font-mono uppercase tracking-wider text-white/40">
+            <div key={comment.id} className="space-y-1.5">
+              <p className="text-base text-[#37352f] leading-relaxed">{comment.content}</p>
+              <div className="flex items-center gap-2 text-sm text-[#9b9a97]">
                 <span>{comment.email}</span>
                 <span>·</span>
                 <time>{new Date(comment.created_at).toLocaleDateString('zh-CN')}</time>
@@ -148,7 +148,7 @@ function Comments({ slug }: CommentsProps) {
           ))}
 
           {comments.length === 0 && (
-            <p className="text-xs font-mono uppercase tracking-wider text-white/40">
+            <p className="text-sm text-[#9b9a97]">
               暂无评论，来发表第一条评论吧
             </p>
           )}
