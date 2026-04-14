@@ -17,6 +17,7 @@ export interface BlogPostMeta {
   summary: string;
   tags: string[];
   coverImage?: string;
+  content?: string;
 }
 
 export interface Frontmatter {

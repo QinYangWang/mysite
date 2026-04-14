@@ -356,4 +356,48 @@ syncAPI.post('/delete-batch', async (c) => {
   }
 });
 
+// 发布资源上传（图片/附件）
+syncAPI.post('/publish-assets', async (c) => {
+  try {
+    const body = await c.req.json<{
+      assets: Array<{ key: string; content: string; contentType?: string; encoding?: 'utf-8' | 'base64' }>;
+    }>();
+    const uploaded: string[] = [];
+    for (const asset of body.assets || []) {
+      let fileContent: string | ArrayBuffer = asset.content;
+      if (asset.encoding === 'base64') {
+        const binary = atob(asset.content);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        fileContent = bytes.buffer;
+      }
+      const contentType = asset.contentType || 'application/octet-stream';
+      await c.env.BUCKET.put(asset.key, fileContent, {
+        httpMetadata: { contentType },
+      });
+      uploaded.push(asset.key);
+    }
+    return c.json({ success: true, data: { uploaded, count: uploaded.length } });
+  } catch (error) {
+    console.error('Publish assets error:', error);
+    return c.json({ success: false, error: 'Publish assets failed' }, 500);
+  }
+});
+
+// 接收发布索引
+syncAPI.post('/publish-index', async (c) => {
+  try {
+    const body = await c.req.json<{ index: any }>();
+    await c.env.BUCKET.put('publish-index.json', JSON.stringify(body.index), {
+      httpMetadata: { contentType: 'application/json' },
+    });
+    return c.json({ success: true, data: { saved: true } });
+  } catch (error) {
+    console.error('Publish index error:', error);
+    return c.json({ success: false, error: 'Publish index failed' }, 500);
+  }
+});
+
 export { syncAPI };

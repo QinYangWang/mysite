@@ -48,6 +48,7 @@ export async function getPublishedPosts(bucket: R2Bucket, limit: number = 20, _c
       summary: parsed.frontmatter.summary || '',
       tags: normalizeTags(parsed.frontmatter.tags),
       coverImage: parsed.frontmatter.coverImage,
+      content: parsed.content,
     });
   }
 
