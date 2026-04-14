@@ -159,4 +159,27 @@ blogAPI.get('/site', async (c) => {
   });
 });
 
+// Sitemap XML
+blogAPI.get('/sitemap.xml', async (c) => {
+  try {
+    const { posts } = await getPublishedPosts(c.env.BUCKET, 1000);
+    const baseUrl = c.req.url.replace(/\/api\/blog\/sitemap\.xml$/, '');
+
+    const urls = posts.map((post: any) => {
+      const lastmod = post.date ? new Date(post.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+      return `  <url>\n    <loc>${baseUrl}/blog/${post.slug}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`;
+    });
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>`;
+
+    return c.body(xml, 200, {
+      'Content-Type': 'application/xml',
+      'Cache-Control': 'public, max-age=3600',
+    });
+  } catch (error) {
+    console.error('Sitemap error:', error);
+    return c.json({ success: false, error: 'Failed to generate sitemap' }, 500);
+  }
+});
+
 export { blogAPI };

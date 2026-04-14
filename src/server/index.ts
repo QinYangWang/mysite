@@ -5,6 +5,7 @@ import { commentsAPI } from './api/comments';
 import { analyticsAPI } from './api/analytics';
 import { rssAPI, generateRSS } from './api/rss';
 import { syncAPI } from './api/sync';
+import { getPostBySlug } from './utils/r2';
 
 const app = new Hono<{
   Bindings: Env;
@@ -74,6 +75,46 @@ app.get('*', async (c) => {
     return c.notFound();
   }
 
+  // Check if this is a blog post route for OG tag injection
+  const blogMatch = url.pathname.match(/^\/blog\/([^\/]+)\/?$/);
+  if (blogMatch) {
+    const slug = blogMatch[1];
+    try {
+      const post = await getPostBySlug(c.env.BUCKET, slug);
+      if (post) {
+        const baseUrl = url.origin;
+        const indexResponse = await assets.fetch(new URL('/index.html', c.req.url));
+        let html = await indexResponse.text();
+
+        const ogTags = [
+          `<meta property="og:title" content="${escapeHtml(post.title)}" />`,
+          `<meta property="og:description" content="${escapeHtml(post.summary || 'A blog post')}" />`,
+          `<meta property="og:type" content="article" />`,
+          `<meta property="og:url" content="${baseUrl}/blog/${slug}" />`,
+          post.coverImage ? `<meta property="og:image" content="${baseUrl}/api/blog/images/${post.coverImage}" />` : '',
+          `<meta name="twitter:card" content="summary_large_image" />`,
+          `<meta name="twitter:title" content="${escapeHtml(post.title)}" />`,
+          `<meta name="twitter:description" content="${escapeHtml(post.summary || 'A blog post')}" />`,
+          post.coverImage ? `<meta name="twitter:image" content="${baseUrl}/api/blog/images/${post.coverImage}" />` : '',
+          `<title>${escapeHtml(post.title)}</title>`,
+          `<meta name="description" content="${escapeHtml(post.summary || 'A blog post')}" />`,
+        ].filter(Boolean).join('\n');
+
+        // Inject into <head>
+        html = html.replace('</head>', `${ogTags}\n</head>`);
+
+        return new Response(html, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+          },
+        });
+      }
+    } catch (e) {
+      console.error('OG tag injection error:', e);
+    }
+  }
+
   // Try to serve the static asset
   const assetResponse = await assets.fetch(c.req.raw);
 
@@ -90,5 +131,14 @@ app.get('*', async (c) => {
 
   return assetResponse;
 });
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 export default app;
