@@ -1,6 +1,9 @@
 import { Plugin, Notice, TFile, TFolder, normalizePath } from 'obsidian';
 import matter from 'gray-matter';
 import { CloudflareSyncSettingTab, CloudflareSyncSettings } from './settings';
+import { SyncEngine, ConflictInfo, ConflictResolution } from './sync-engine';
+import { SyncStatusBar } from './status-bar';
+import { ConflictModal } from './conflict-modal';
 
 interface FrontmatterData {
   title?: string;
@@ -12,20 +15,77 @@ interface FrontmatterData {
   coverImage?: string;
 }
 
+interface RemoteFile {
+  key: string;
+  content: string;
+  contentType?: string;
+  size: number;
+  uploaded?: string;
+  httpEtag?: string;
+  contentHash?: string;
+  encoding?: string;
+}
+
 export default class CloudflareSyncPlugin extends Plugin {
   settings: CloudflareSyncSettings;
+  syncEngine: SyncEngine;
+  statusBar: SyncStatusBar;
 
   async onload() {
     await this.loadSettings();
+
+    // 初始化同步引擎
+    this.syncEngine = new SyncEngine(this);
+    await this.syncEngine.loadSyncState();
+
+    // 初始化状态栏
+    this.statusBar = new SyncStatusBar(this, {
+      onShowConflicts: () => this.showConflictModal(),
+      onTriggerSync: () => this.triggerFullSync(),
+    });
+
+    // 绑定同步引擎回调
+    this.syncEngine.onStatsChanged = (stats) => {
+      this.statusBar.updateStats(stats);
+    };
+
+    this.syncEngine.onConflictsFound = (conflicts) => {
+      this.statusBar.updateConflicts(conflicts);
+      new Notice(`⚠️ ${conflicts.length} sync conflict(s) found. Click status bar to resolve.`);
+      this.showConflictModal();
+    };
+
+    this.syncEngine.onSyncComplete = () => {
+      const stats = this.syncEngine.stats;
+      if (stats.conflicts === 0) {
+        new Notice(`✅ Sync complete: ${stats.syncedFiles} files synced`);
+      }
+    };
+
+    this.syncEngine.onSyncError = (error) => {
+      new Notice(`❌ Sync error: ${error}`);
+    };
 
     // 添加设置面板
     this.addSettingTab(new CloudflareSyncSettingTab(this.app, this));
 
     // 添加命令
     this.addCommand({
-      id: 'sync-to-r2',
-      name: 'Sync all published notes to Cloudflare R2',
-      callback: () => this.syncToR2(),
+      id: 'sync-full',
+      name: 'Full sync with Cloudflare',
+      callback: () => this.triggerFullSync(),
+    });
+
+    this.addCommand({
+      id: 'sync-to-remote',
+      name: 'Sync entire vault to Cloudflare (upload only)',
+      callback: () => this.syncToRemote(),
+    });
+
+    this.addCommand({
+      id: 'sync-from-remote',
+      name: 'Download entire vault from Cloudflare',
+      callback: () => this.syncFromRemote(),
     });
 
     this.addCommand({
@@ -36,15 +96,30 @@ export default class CloudflareSyncPlugin extends Plugin {
 
     this.addCommand({
       id: 'sync-current-file',
-      name: 'Sync current file to Cloudflare R2',
+      name: 'Sync current file to Cloudflare',
       editorCallback: () => this.syncCurrentFile(),
     });
 
-    // 监听文件保存事件，自动同步
+    this.addCommand({
+      id: 'resolve-conflicts',
+      name: 'Resolve sync conflicts',
+      callback: () => this.showConflictModal(),
+    });
+
+    this.addCommand({
+      id: 'show-sync-status',
+      name: 'Show sync status',
+      callback: () => {
+        // 触发状态栏点击逻辑
+        this.statusBar['showDetailModal']();
+      },
+    });
+
+    // 监听文件保存事件，使用 debounced 同步
     this.registerEvent(
       this.app.vault.on('modify', (file) => {
         if (file instanceof TFile && this.settings.autoSync) {
-          this.syncFileToR2(file);
+          this.syncEngine.scheduleFileSync(file);
         }
       })
     );
@@ -53,15 +128,30 @@ export default class CloudflareSyncPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on('create', (file) => {
         if (file instanceof TFile && this.settings.autoFrontmatter) {
-          this.updateFileFrontmatter(file);
+          if (file.path.endsWith('.md')) {
+            this.updateFileFrontmatter(file);
+          }
         }
       })
     );
 
     // 添加 Ribbon 图标
-    this.addRibbonIcon('cloud-upload', 'Sync to Cloudflare', () => {
-      this.syncToR2();
+    this.addRibbonIcon('cloud-upload', 'Full Sync with Cloudflare', () => {
+      this.triggerFullSync();
     });
+
+    // 启动自动同步
+    if (this.settings.autoSync) {
+      this.syncEngine.startAutoSync();
+    }
+
+    // 启动时同步
+    if (this.settings.syncOnStartup) {
+      // 延迟 3 秒等 Obsidian 完全加载
+      setTimeout(() => {
+        this.triggerFullSync();
+      }, 3000);
+    }
 
     console.log('Cloudflare Sync plugin loaded');
   }
@@ -69,14 +159,17 @@ export default class CloudflareSyncPlugin extends Plugin {
   async loadSettings() {
     this.settings = Object.assign(
       {
-        r2ApiEndpoint: '',
-        r2AccountId: '',
-        r2AccessKeyId: '',
-        r2SecretAccessKey: '',
-        bucketName: '',
+        serverUrl: '',
+        apiToken: '',
         autoSync: true,
         autoFrontmatter: true,
-        syncFolder: '/',
+        syncAllFiles: true,
+        excludeFolders: ['_templates', '.trash'],
+        excludeFiles: [],
+        autoSyncInterval: 5,
+        conflictStrategy: 'ask' as const,
+        syncOnStartup: true,
+        debounceDelay: 30,
       },
       await this.loadData()
     );
@@ -84,14 +177,123 @@ export default class CloudflareSyncPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+
+    // 重启自动同步（间隔可能改变）
+    if (this.syncEngine) {
+      if (this.settings.autoSync) {
+        this.syncEngine.startAutoSync();
+      } else {
+        this.syncEngine.stopAutoSync();
+      }
+    }
   }
 
-  // 解析文件元数据生成 frontmatter
+  // ========== Sync Triggers ==========
+
+  async triggerFullSync(): Promise<void> {
+    if (!this.settings.serverUrl || !this.settings.apiToken) {
+      new Notice('Please configure Server URL and API Token in settings');
+      return;
+    }
+
+    // Test connection first
+    try {
+      await this.api('/api/blog/site');
+    } catch (error: any) {
+      new Notice(`Connection failed: ${error.message}`);
+      return;
+    }
+
+    new Notice('Starting full sync...');
+    await this.syncEngine.fullSync();
+  }
+
+  showConflictModal(): void {
+    const conflicts = this.syncEngine.conflicts;
+    if (conflicts.length === 0) {
+      new Notice('No conflicts to resolve');
+      return;
+    }
+
+    new ConflictModal(
+      this.app,
+      conflicts,
+      async (conflict, resolution) => {
+        await this.syncEngine.resolveConflict(conflict, resolution);
+        this.statusBar.updateConflicts(this.syncEngine.conflicts);
+      },
+      async (resolution) => {
+        await this.syncEngine.resolveAllConflicts(resolution);
+        this.statusBar.updateConflicts(this.syncEngine.conflicts);
+      }
+    ).open();
+  }
+
+  // ========== API 调用 ==========
+
+  async api<T = any>(endpoint: string, options?: RequestInit): Promise<T> {
+    const { serverUrl, apiToken } = this.settings;
+
+    if (!serverUrl || !apiToken) {
+      throw new Error(`Server URL (${serverUrl || 'empty'}) and API token (${apiToken ? 'set' : 'empty'}) are required`);
+    }
+
+    const url = serverUrl.replace(/\/$/, '') + endpoint;
+    console.log(`[API] ${options?.method || 'GET'} ${url}`);
+
+    const headers = new Headers(options?.headers);
+    headers.set('Authorization', `Bearer ${apiToken}`);
+    if (options?.method && options.method !== 'GET') {
+      headers.set('Content-Type', 'application/json');
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    console.log(`[API] Response: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: response.statusText }));
+      throw new Error(`API error ${response.status}: ${error.error || response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // ========== 上传/下载 ==========
+
+  async uploadFile(key: string, content: string, contentType = 'text/markdown', encoding: 'utf-8' | 'base64' = 'utf-8'): Promise<void> {
+    await this.api('/api/sync/upload', {
+      method: 'POST',
+      body: JSON.stringify({ key, content, contentType, encoding }),
+    });
+  }
+
+  async downloadFile(key: string): Promise<RemoteFile> {
+    const res = await this.api<{ success: boolean; data: RemoteFile }>(`/api/sync/download/${key}`);
+    return res.data;
+  }
+
+  async listFiles(prefix = ''): Promise<{ key: string; size: number; uploaded?: string; httpEtag?: string }[]> {
+    const res = await this.api<{ success: boolean; data: { files: any[] } }>(
+      `/api/sync/list?prefix=${encodeURIComponent(prefix)}`
+    );
+    return res.data.files;
+  }
+
+  async deleteFile(key: string): Promise<void> {
+    await this.api(`/api/sync/delete/${key}`, { method: 'DELETE' });
+  }
+
+  // ========== Frontmatter 处理 ==========
+
   async generateFrontmatter(file: TFile): Promise<FrontmatterData> {
     const content = await this.app.vault.read(file);
     const existing = matter(content);
-    
-    const frontmatter: FrontmatterData = {
+
+    return {
       title: existing.data.title || file.basename,
       slug: existing.data.slug || this.generateSlug(file.basename),
       date: existing.data.date || new Date(file.stat.ctime).toISOString(),
@@ -100,11 +302,8 @@ export default class CloudflareSyncPlugin extends Plugin {
       publish: existing.data.publish ?? false,
       coverImage: existing.data.coverImage,
     };
-
-    return frontmatter;
   }
 
-  // 从文件名生成 slug
   generateSlug(filename: string): string {
     return filename
       .toLowerCase()
@@ -113,32 +312,24 @@ export default class CloudflareSyncPlugin extends Plugin {
       .substring(0, 100);
   }
 
-  // 提取摘要
   extractSummary(content: string): string {
     const firstParagraph = content.split('\n\n')[0];
     return firstParagraph.replace(/[#*`_\[\]]/g, '').substring(0, 200);
   }
 
-  // 更新文件的 frontmatter
   async updateFileFrontmatter(file: TFile): Promise<void> {
     if (!file.path.endsWith('.md')) return;
 
     const content = await this.app.vault.read(file);
-    
-    // 检查是否已有 frontmatter
-    if (content.startsWith('---')) {
-      return; // 已有 frontmatter，跳过
-    }
+    if (content.startsWith('---')) return;
 
     const frontmatter = await this.generateFrontmatter(file);
-    
     const newContent = matter.stringify(content, frontmatter);
     await this.app.vault.modify(file, newContent);
 
     new Notice(`Updated frontmatter for ${file.name}`);
   }
 
-  // 更新当前文件的 frontmatter
   async updateCurrentFileFrontmatter(editor: any): Promise<void> {
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {
@@ -149,69 +340,218 @@ export default class CloudflareSyncPlugin extends Plugin {
     const frontmatter = await this.generateFrontmatter(activeFile);
     const content = editor.getValue();
     const newContent = matter.stringify(content, frontmatter);
-    
+
     editor.setValue(newContent);
     new Notice('Updated frontmatter');
   }
 
-  // 同步单个文件到 R2
-  async syncFileToR2(file: TFile): Promise<void> {
-    if (!file.path.endsWith('.md')) return;
-    if (!file.path.startsWith(this.settings.syncFolder)) return;
+  // ========== 同步逻辑 ==========
+
+  shouldSyncFile(filePath: string): boolean {
+    // 排除特定文件夹
+    for (const exclude of this.settings.excludeFolders || []) {
+      if (filePath.startsWith(exclude + '/') || filePath.startsWith(exclude)) {
+        return false;
+      }
+    }
+
+    // 排除 .conflict 文件
+    if (filePath.includes('.conflict-')) {
+      return false;
+    }
+
+    return true;
+  }
+
+  getRemoteKey(file: TFile): string {
+    return `vault/${file.path}`;
+  }
+
+  getMimeType(ext: string): string {
+    const map: Record<string, string> = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+      gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+      avif: 'image/avif', pdf: 'application/pdf',
+      mp3: 'audio/mpeg', mp4: 'video/mp4',
+      json: 'application/json', yaml: 'text/yaml', yml: 'text/yaml',
+      css: 'text/css', js: 'text/javascript', ts: 'text/typescript',
+    };
+    return map[ext.toLowerCase()] || 'application/octet-stream';
+  }
+
+  async syncFileToRemote(file: TFile): Promise<void> {
+    if (!this.shouldSyncFile(file.path)) return;
 
     try {
-      const content = await this.app.vault.read(file);
-      const parsed = matter(content);
-      
-      // 如果 publish 为 false，仍然同步但不公开
-      const isPublished = parsed.data.publish === true;
+      const isMarkdown = file.path.endsWith('.md');
+      console.log(`[Sync] Reading file: ${file.path} (${isMarkdown ? 'markdown' : file.extension})`);
 
-      // 上传 markdown 文件
-      await this.uploadToR2(
-        `posts/${file.name}`,
-        content,
-        'text/markdown'
-      );
+      let content: string;
+      let contentType: string;
+      let encoding: 'utf-8' | 'base64' = 'utf-8';
 
-      // 提取并上传图片
-      if (isPublished) {
-        await this.extractAndUploadImages(content, file);
+      if (isMarkdown) {
+        content = await this.app.vault.read(file);
+        contentType = 'text/markdown';
+      } else {
+        // 二进制文件用 base64 编码
+        const buffer = await this.app.vault.readBinary(file);
+        content = this.arrayBufferToBase64(buffer);
+        encoding = 'base64';
+        contentType = this.getMimeType(file.extension);
       }
 
-      console.log(`Synced ${file.name} to R2`);
-    } catch (error) {
-      console.error(`Failed to sync ${file.name}:`, error);
-      new Notice(`Failed to sync ${file.name}`);
+      console.log(`[Sync] File size: ${file.stat.size} bytes, encoding: ${encoding}`);
+
+      // 如果是 markdown，检查是否已发布以决定是否上传图片
+      const isPublished = isMarkdown
+        ? (() => {
+            const parsed = matter(content);
+            return parsed.data.publish === true;
+          })()
+        : false;
+
+      // 上传文件
+      const remoteKey = this.getRemoteKey(file);
+      console.log(`[Sync] Uploading to: ${remoteKey}`);
+      await this.uploadFile(remoteKey, content, contentType, encoding);
+      console.log(`[Sync] ✅ Uploaded ${file.name}`);
+
+      // 如果 markdown 已发布，提取并上传图片
+      if (isMarkdown && isPublished) {
+        console.log(`[Sync] Extracting images from ${file.name}`);
+        await this.extractAndUploadImages(content, file);
+      }
+    } catch (error: any) {
+      console.error(`[Sync] ❌ Failed to sync ${file.name}:`, error.message);
+      throw error;
     }
   }
 
-  // 同步所有已发布的文件到 R2
-  async syncToR2(): Promise<void> {
-    new Notice('Syncing to Cloudflare R2...');
+  async syncFileFromRemote(remoteFile: { key: string }): Promise<void> {
+    try {
+      const data = await this.downloadFile(remoteFile.key);
+      // vault/notes/my-note.md -> notes/my-note.md
+      const localPath = data.key.replace(/^vault\//, '');
+
+      const existingFile = this.app.vault.getAbstractFileByPath(localPath);
+      const isMarkdown = localPath.endsWith('.md');
+
+      if (existingFile instanceof TFile) {
+        if (isMarkdown || data.encoding === 'utf-8') {
+          // 文本文件直接比较
+          const localContent = await this.app.vault.read(existingFile);
+          if (localContent !== data.content) {
+            await this.app.vault.modify(existingFile, data.content);
+            console.log(`[Download] Updated ${localPath}`);
+          }
+        } else {
+          // 二进制文件比较大小
+          if (existingFile.stat.size !== data.size) {
+            const buffer = this.base64ToArrayBuffer(data.content);
+            await this.app.vault.modifyBinary(existingFile, buffer);
+            console.log(`[Download] Updated ${localPath}`);
+          }
+        }
+      } else {
+        // 文件不存在，创建
+        const folderPath = localPath.substring(0, localPath.lastIndexOf('/'));
+        if (folderPath) {
+          await this.app.vault.createFolder(folderPath).catch(() => {});
+        }
+
+        if (isMarkdown || data.encoding === 'utf-8') {
+          await this.app.vault.create(localPath, data.content);
+        } else {
+          const buffer = this.base64ToArrayBuffer(data.content);
+          await this.app.vault.createBinary(localPath, buffer);
+        }
+        console.log(`[Download] Created ${localPath}`);
+      }
+    } catch (error: any) {
+      console.error(`[Download] Failed to sync ${remoteFile.key}:`, error.message);
+    }
+  }
+
+  base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  async syncToRemote(): Promise<void> {
+    new Notice('Syncing vault to Cloudflare...');
 
     try {
-      const files = this.app.vault.getMarkdownFiles();
+      const files = this.app.vault.getFiles();
       let synced = 0;
+      let skipped = 0;
+
+      console.log(`[Sync] Found ${files.length} files in vault`);
+
+      // Test API connection first
+      try {
+        await this.api('/api/blog/site');
+        console.log('[Sync] ✅ API connection test passed');
+      } catch (error: any) {
+        console.error('[Sync] ❌ API connection test failed:', error.message);
+        new Notice(`Connection failed: ${error.message}`);
+        return;
+      }
 
       for (const file of files) {
-        if (!file.path.startsWith(this.settings.syncFolder)) continue;
+        if (!this.shouldSyncFile(file.path)) {
+          skipped++;
+          continue;
+        }
 
         try {
-          await this.syncFileToR2(file);
+          await this.syncFileToRemote(file);
           synced++;
-        } catch (error) {
-          console.error(`Failed to sync ${file.name}:`, error);
+        } catch (error: any) {
+          console.error(`[Sync] ❌ Failed to sync ${file.path}:`, error.message);
         }
       }
 
-      new Notice(`Successfully synced ${synced} files to Cloudflare R2`);
-    } catch (error) {
-      console.error('Failed to sync to R2:', error);
-      new Notice('Failed to sync to Cloudflare R2');
+      console.log(`[Sync] Done: ${synced} synced, ${skipped} skipped`);
+      new Notice(`Synced ${synced}/${files.length} files (${skipped} skipped)`);
+    } catch (error: any) {
+      console.error('[Sync] Failed to sync:', error);
+      new Notice(`Sync failed: ${error.message}`);
     }
   }
 
-  // 同步当前文件
+  async syncFromRemote(): Promise<void> {
+    new Notice('Downloading from Cloudflare...');
+
+    try {
+      console.log('[Download] Listing remote files...');
+      const remoteFiles = await this.listFiles('vault/');
+      console.log(`[Download] Found ${remoteFiles.length} remote files`);
+
+      let synced = 0;
+
+      for (const remoteFile of remoteFiles) {
+        console.log(`[Download] Processing: ${remoteFile.key}`);
+        try {
+          await this.syncFileFromRemote(remoteFile);
+          synced++;
+        } catch (error: any) {
+          console.error(`[Download] Failed to sync ${remoteFile.key}:`, error.message);
+        }
+      }
+
+      console.log(`[Download] Done: ${synced} files processed`);
+      new Notice(`Downloaded ${synced} files from Cloudflare`);
+    } catch (error: any) {
+      console.error('[Download] Failed:', error);
+      new Notice(`Download failed: ${error.message}`);
+    }
+  }
+
   async syncCurrentFile(): Promise<void> {
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {
@@ -219,71 +559,63 @@ export default class CloudflareSyncPlugin extends Plugin {
       return;
     }
 
-    await this.syncFileToR2(activeFile);
-    new Notice(`Synced ${activeFile.name} to Cloudflare R2`);
+    await this.syncFileToRemote(activeFile);
+    new Notice(`Synced ${activeFile.name} to Cloudflare`);
   }
 
-  // 提取并上传图片
+  // ========== 图片处理 ==========
+
   async extractAndUploadImages(content: string, file: TFile): Promise<void> {
     const imageRegex = /!\[.*?\]\((.*?)\)/g;
     let match;
 
     while ((match = imageRegex.exec(content)) !== null) {
       const imagePath = match[1];
-      
-      // 处理相对路径
+
       if (imagePath.startsWith('./') || !imagePath.startsWith('http')) {
         const folder = file.parent?.path || '';
         const fullPath = normalizePath(`${folder}/${imagePath}`);
         const imageFile = this.app.vault.getAbstractFileByPath(fullPath);
-        
+
         if (imageFile instanceof TFile) {
-          const imageContent = await this.app.vault.readBinary(imageFile);
-          await this.uploadToR2(
-            `images/${imageFile.name}`,
-            imageContent,
-            imageFile.extension
-          );
+          const imageBuffer = await this.app.vault.readBinary(imageFile);
+          const base64 = this.arrayBufferToBase64(imageBuffer);
+          const ext = imageFile.extension.toLowerCase();
+
+          let contentType = 'application/octet-stream';
+          if (['jpg', 'jpeg'].includes(ext)) contentType = `image/jpeg`;
+          else if (ext === 'png') contentType = 'image/png';
+          else if (ext === 'gif') contentType = 'image/gif';
+          else if (ext === 'webp') contentType = 'image/webp';
+          else if (ext === 'svg') contentType = 'image/svg+xml';
+
+          await this.api('/api/sync/upload', {
+            method: 'POST',
+            body: JSON.stringify({
+              key: `images/${imageFile.name}`,
+              content: base64,
+              contentType,
+              encoding: 'base64',
+            }),
+          });
         }
       }
     }
   }
 
-  // 上传到 R2 (通过 Cloudflare R2 API)
-  async uploadToR2(key: string, content: string | ArrayBuffer, contentType: string): Promise<void> {
-    const { r2ApiEndpoint, r2AccountId, r2AccessKeyId, r2SecretAccessKey, bucketName } = this.settings;
-    
-    if (!r2AccountId || !bucketName) {
-      console.warn('R2 credentials not configured');
-      return;
+  arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
     }
-
-    // 使用 S3 兼容 API
-    const endpoint = `https://${r2AccountId}.r2.cloudflarestorage.com`;
-    const url = `${endpoint}/${bucketName}/${key}`;
-
-    // 生成签名（简化版本，实际应使用 AWS SDK）
-    const headers = new Headers();
-    headers.set('Content-Type', contentType);
-    headers.set('Authorization', `Bearer ${r2AccessKeyId}`);
-
-    try {
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers,
-        body: content,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error(`Failed to upload ${key}:`, error);
-      throw error;
-    }
+    return btoa(binary);
   }
 
   onunload() {
+    console.log('Cloudflare Sync plugin unloading...');
+    this.syncEngine?.destroy();
+    this.statusBar?.destroy();
     console.log('Cloudflare Sync plugin unloaded');
   }
 }

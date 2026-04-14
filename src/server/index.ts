@@ -4,6 +4,7 @@ import { blogAPI } from './api/blog';
 import { commentsAPI } from './api/comments';
 import { analyticsAPI } from './api/analytics';
 import { rssAPI, generateRSS } from './api/rss';
+import { syncAPI } from './api/sync';
 
 const app = new Hono<{
   Bindings: Env;
@@ -17,6 +18,9 @@ app.route('/api/blog', blogAPI);
 app.route('/api/comments', commentsAPI);
 app.route('/api/analytics', analyticsAPI);
 app.route('/api/rss', rssAPI);
+
+// 同步 API（需要 token 认证）
+app.route('/api/sync', syncAPI);
 
 // RSS feed 路由
 app.get('/feed.xml', async (c) => {

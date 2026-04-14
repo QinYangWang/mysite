@@ -19,14 +19,13 @@
 			"binding": "DB",
 			"database_name": "mysite-d1",
 			"database_id": "4a9f0859-caad-4eba-8daf-15d10e06c02f",
-			"remote": true
+			"migrations_dir": "migrations"
 		}
 	],
 	"r2_buckets": [
 		{
 			"bucket_name": "mysite-r2",
-			"binding": "BUCKET",
-			"remote": true
+			"binding": "BUCKET"
 		}
 	],
 	"analytics_engine_datasets": [

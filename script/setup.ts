@@ -175,17 +175,13 @@ async function main() {
   }
 
   // 检查并创建 D1
-  let d1DatabaseId = d1Config?.database_id || '';
+  let d1DatabaseId = '';
   if (d1Config) {
+    // 忽略模板中的占位符，使用实际检测/创建的 ID
     const result = await checkAndCreateD1(d1Config.database_name);
     if (result.databaseId) {
       d1DatabaseId = result.databaseId;
       createdResources.d1 = result.created;
-
-      // 运行迁移
-      if (result.created || result.databaseId) {
-        await runMigrations(d1Config.database_name);
-      }
     }
   }
 
@@ -201,11 +197,11 @@ async function main() {
   console.log('\n📝 Generating wrangler.json...');
   const wranglerConfig = { ...template };
 
-  // 更新 D1 database_id
+  // 更新 D1 database_id（替换占位符或填入真实 ID）
   if (d1Config && d1DatabaseId) {
     wranglerConfig.d1_databases = wranglerConfig.d1_databases.map((db: any) => ({
       ...db,
-      database_id: db.database_id || d1DatabaseId,
+      database_id: d1DatabaseId,
     }));
   }
 
@@ -218,6 +214,17 @@ async function main() {
   run('npx wrangler types');
   console.log('  ✅ Generated worker-configuration.d.ts');
 
+  // 运行迁移
+  if (d1Config && d1DatabaseId) {
+    await runMigrations(d1Config.database_name);
+  }
+
+  // 提示设置 API_TOKEN secret
+  console.log('\n🔑 API_TOKEN Secret');
+  console.log('  The Obsidian plugin uses API_TOKEN for authentication.');
+  console.log('  Set it with: npx wrangler secret put API_TOKEN');
+  console.log('  (This should be a strong random string)');
+
   // 总结
   console.log('\n' + '='.repeat(50));
   console.log('✨ Setup complete!\n');
@@ -229,6 +236,7 @@ async function main() {
   console.log('\nNext steps:');
   console.log('  npm run dev       - Start local development');
   console.log('  npm run deploy    - Deploy to Cloudflare');
+  console.log('  npx wrangler secret put API_TOKEN  - (if skipped)');
 
   rl.close();
 }

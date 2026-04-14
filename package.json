@@ -45,7 +45,7 @@
 		"build:plugin": "npx tsx script/build-plugin.ts",
 		"cf-typegen": "wrangler types",
 		"check": "tsc && vite build && wrangler deploy --dry-run",
-		"deploy": "wrangler deploy",
+		"deploy": "npm run build && npx wrangler deploy",
 		"dev": "vite",
 		"lint": "eslint .",
 		"preview": "npm run build && vite preview",
