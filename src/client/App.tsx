@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import PostDetail from './pages/PostDetail';
 import Admin from './pages/Admin';
 import Graph from './pages/Graph';
+import NotFound from './pages/NotFound';
 
 function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -97,6 +98,7 @@ function App() {
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/analytics" element={<Admin />} />
             <Route path="/graph" element={<Graph />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
         <Footer />

@@ -25,6 +25,22 @@ interface Heading {
   id: string;
 }
 
+interface GraphNode {
+  id: string;
+  title: string;
+  tags: string[];
+}
+
+interface GraphLink {
+  source: string;
+  target: string;
+}
+
+interface GraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+
 // Parse callout syntax: > [!type] title\n> content...
 function parseCallout(text: string): { type: string; title: string; content: string } | null {
   const match = text.match(/^\[!\s*(\w+)\s*\]\s*(.*)?\n?/);
@@ -60,6 +76,7 @@ function PostDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeHeading, setActiveHeading] = useState<string>('');
+  const [backlinks, setBacklinks] = useState<GraphNode[]>([]);
 
   useEffect(() => {
     async function fetchPost() {
@@ -86,6 +103,23 @@ function PostDetail() {
         body: JSON.stringify({ path: `/${slug}`, referrer: document.referrer || undefined, userAgent: navigator.userAgent }),
       }).catch(() => {});
     }
+  }, [slug]);
+
+  useEffect(() => {
+    if (!slug) return;
+    fetch('/api/blog/graph-data')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          const graph: GraphData = data.data;
+          const incoming = graph.links
+            .filter((link) => link.target === slug)
+            .map((link) => graph.nodes.find((n) => n.id === link.source))
+            .filter(Boolean) as GraphNode[];
+          setBacklinks(incoming);
+        }
+      })
+      .catch(() => {});
   }, [slug]);
 
   const headings = useMemo<Heading[]>(() => {
@@ -272,6 +306,33 @@ function PostDetail() {
         </ReactMarkdown>
       </div>
 
+      {/* Backlinks */}
+      {backlinks.length > 0 && (
+        <div className="pt-8 border-t border-border">
+          <h3 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">反向链接</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {backlinks.map((node) => (
+              <Link
+                key={node.id}
+                to={`/blog/${node.id}`}
+                className="group block rounded-[6px] border border-border bg-secondary p-4 hover:bg-secondary/80 transition-colors"
+              >
+                <div className="font-medium text-foreground group-hover:underline underline-offset-2">{node.title}</div>
+                {node.tags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {node.tags.map((tag) => (
+                      <span key={tag} className="px-1.5 py-0.5 text-[10px] rounded-[3px] bg-background text-muted-foreground">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Comments */}
       <div className="pt-8 border-t border-border">
         <Comments slug={slug!} />
@@ -286,8 +347,9 @@ function MermaidBlock({ content }: { content: string }) {
 
   useEffect(() => {
     let mounted = true;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     import('mermaid').then((m) => {
-      m.default.initialize({ startOnLoad: false, theme: 'default' });
+      m.default.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default' });
       m.default.render(`mermaid-${Math.random().toString(36).slice(2)}`, content).then((result) => {
         if (mounted) setSvg(result.svg);
       }).catch((e) => {

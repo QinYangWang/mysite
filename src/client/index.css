@@ -190,11 +190,23 @@
   background: var(--muted);
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
+:root[data-theme="dark"] .prose-custom pre {
+  background: #0d0d0d;
+  border-color: rgba(255, 255, 255, 0.1);
+}
 .prose-custom code {
   @apply rounded-[3px] px-1.5 py-0.5 text-sm;
   background: var(--muted);
   color: var(--destructive);
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] .prose-custom code {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ff8a8a;
+}
+/* KaTeX dark mode overrides */
+:root[data-theme="dark"] .katex {
+  color: rgba(255, 255, 255, 0.9);
 }
 .prose-custom blockquote {
   @apply border-l-4 pl-4 italic;
